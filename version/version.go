@@ -6,6 +6,7 @@ package version
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"os"
 
@@ -15,7 +16,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-var Version = "0.2.6"
+//go:embed version.txt
+var Version string
 
 type versions struct {
 	minimal *semver.Version
@@ -119,6 +121,6 @@ func Check() {
 		os.Exit(1)
 		// TODO: Ask permission to selfupdate instead of exiting
 	case CanUpdate:
-			fmt.Printf("Warning: there's a newer version (%s), but this version (%s) is still usable.\n", versions.latest.String(), Version)
+		fmt.Printf("Warning: there's a newer version (%s), but this version (%s) is still usable.\n", versions.latest.String(), Version)
 	}
 }
