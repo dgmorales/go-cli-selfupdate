@@ -8,10 +8,12 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"log"
 	"os"
 
+	"github.com/blang/semver"
 	"github.com/dgmorales/go-cli-selfupdate/kube"
-	semver "github.com/hashicorp/go-version"
+	"github.com/rhysd/go-github-selfupdate/selfupdate"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -20,8 +22,9 @@ import (
 var Version string
 
 type versions struct {
-	minimal *semver.Version
-	latest  *semver.Version
+	repository string
+	minimal    *semver.Version
+	latest     *semver.Version
 }
 
 type updateDecision int
@@ -32,22 +35,25 @@ const (
 	MustUpdate
 )
 
-//func SelfUpdate(kc *kubernetes.Clientset) error {
-// cliInfo, err := kc.CoreV1().ConfigMaps(SYSTEM_NS).Get(context.Background(), "cli-info", metav1.GetOptions{})
-// resp, err := http.Get(url)
-// if err != nil {
-// 	return err
-// }
-// defer resp.Body.Close()
-
-// err = selfupdate.Apply(resp.Body, update.Options{})
-// selfupdate.
-// if err != nil {
-// 	// error handling
-// }
-// return err
-//	return nil
-//}
+func doSelfUpdate(repo string) {
+	if repo == "" {
+		fmt.Println("Can't update")
+		return
+	}
+	v := semver.MustParse(Version)
+	latest, err := selfupdate.UpdateSelf(v, repo)
+	if err != nil {
+		log.Println("Binary update failed:", err)
+		return
+	}
+	if latest.Version.Equals(v) {
+		// latest version is the same as current version. It means current binary is up to date.
+		log.Println("Current binary is the latest version", Version)
+	} else {
+		log.Println("Successfully updated to version", latest.Version)
+		log.Println("Release note:\n", latest.ReleaseNotes)
+	}
+}
 
 // getVersionsFromConfigMap get version information from a Kubernetes ConfigMap
 //
@@ -66,17 +72,25 @@ func getVersionsFromConfigMap(kc *kubernetes.Clientset, ns string, name string) 
 		return res, append(errorList, err)
 	}
 
+	if val, ok := cm.Data["repository"]; ok {
+		res.repository = val
+	}
+
 	if val, ok := cm.Data["minimal-required-version"]; ok {
-		res.minimal, err = semver.NewVersion(val)
+		v, err := semver.Make(val)
 		if err != nil {
 			errorList = append(errorList, err)
+		} else {
+			res.minimal = &v
 		}
 	}
 
 	if val, ok := cm.Data["latest-version"]; ok {
-		res.latest, err = semver.NewVersion(val)
+		v, err := semver.Make(val)
 		if err != nil {
 			errorList = append(errorList, err)
+		} else {
+			res.latest = &v
 		}
 	}
 
@@ -90,16 +104,16 @@ func getVersionsFromConfigMap(kc *kubernetes.Clientset, ns string, name string) 
 func check(v versions) (updateDecision, error) {
 	res := IsLatest
 
-	curVer, err := semver.NewVersion(Version)
+	curVer, err := semver.Make(Version)
 	if err != nil {
 		panic("This should never happen. Wrong version set internally.")
 	}
 
-	if v.minimal != nil && curVer.LessThan(v.minimal) {
+	if v.minimal != nil && curVer.Compare(*v.minimal) == -1 {
 		return MustUpdate, nil
 	} // ignore if minimal required version is unset
 
-	if v.latest != nil && curVer.LessThan(v.latest) {
+	if v.latest != nil && curVer.Compare(*v.latest) == -1 {
 		return CanUpdate, nil
 	} // ignore if latest version is unset
 
@@ -118,8 +132,9 @@ func Check() {
 	switch decision {
 	case MustUpdate:
 		fmt.Printf("Fatal: your current version (%s) is not supported anymore (minimal: %s). You need to upgrade.\n", Version, versions.minimal.String())
-		os.Exit(1)
+		doSelfUpdate(versions.repository)
 		// TODO: Ask permission to selfupdate instead of exiting
+		os.Exit(0)
 	case CanUpdate:
 		fmt.Printf("Warning: there's a newer version (%s), but this version (%s) is still usable.\n", versions.latest.String(), Version)
 	}
