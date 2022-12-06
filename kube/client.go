@@ -10,7 +10,7 @@ const SYSTEM_NS = "sreplatform-system"
 var Flags = genericclioptions.NewConfigFlags(true)
 var Client *kubernetes.Clientset
 
-func newK8SClient() (*kubernetes.Clientset, error) {
+func NewClient() (*kubernetes.Clientset, error) {
 	cfg, err := Flags.ToRESTConfig()
 	if err != nil {
 		return nil, err
@@ -27,7 +27,7 @@ func newK8SClient() (*kubernetes.Clientset, error) {
 func init() {
 	var err error
 
-	Client, err = newK8SClient()
+	Client, err = NewClient()
 	if err != nil {
 		panic("Cannot init K8S client")
 	}
