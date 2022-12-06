@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/Code-Hex/Neo-cowsay/v2 v2.0.4
 	github.com/blang/semver v3.5.1+incompatible
+	github.com/google/go-github/v48 v48.1.0
 	github.com/rhysd/go-github-selfupdate v1.2.3
 	github.com/spf13/cobra v1.6.1
 	k8s.io/apimachinery v0.25.4
@@ -29,7 +30,7 @@ require (
 	github.com/google/btree v1.0.1 // indirect
 	github.com/google/gnostic v0.5.7-v3refs // indirect
 	github.com/google/go-github/v30 v30.1.0 // indirect
-	github.com/google/go-querystring v1.0.0 // indirect
+	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/gofuzz v1.1.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.1.2 // indirect
