@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/dgmorales/go-cli-selfupdate/kube"
+	"github.com/dgmorales/go-cli-selfupdate/logger"
 	"github.com/dgmorales/go-cli-selfupdate/version"
 	"github.com/google/go-github/v48/github"
 	semver "github.com/hashicorp/go-version"
@@ -181,7 +182,7 @@ func Check() {
 	// We will just log errors below and continue, without disturbing user interaction
 	// flow. Version check and update is a non essential feature.
 	if err != nil {
-		fmt.Printf("Info: we are having some trouble checking for a new version of the CLI. Check for our log file in your %s folder\n", os.TempDir())
+		fmt.Printf("Info: we are having some trouble checking for a new version of the CLI. Check details on logfile %s\n", logger.LogFile)
 		log.Println(err)
 	}
 	log.Printf("debug: cli information dump: %v\n", i)
