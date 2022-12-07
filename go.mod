@@ -4,9 +4,9 @@ go 1.18
 
 require (
 	github.com/Code-Hex/Neo-cowsay/v2 v2.0.4
-	github.com/blang/semver v3.5.1+incompatible
 	github.com/google/go-github/v48 v48.1.0
-	github.com/rhysd/go-github-selfupdate v1.2.3
+	github.com/hashicorp/go-version v1.6.0
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/spf13/cobra v1.6.1
 	k8s.io/apimachinery v0.25.4
 	k8s.io/cli-runtime v0.25.4
@@ -29,14 +29,12 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/btree v1.0.1 // indirect
 	github.com/google/gnostic v0.5.7-v3refs // indirect
-	github.com/google/go-github/v30 v30.1.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/gofuzz v1.1.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.1.2 // indirect
 	github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7 // indirect
 	github.com/imdario/mergo v0.3.6 // indirect
-	github.com/inconshreveable/go-update v0.0.0-20160112193335-8152e7eb6ccf // indirect
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
@@ -51,8 +49,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/tcnksm/go-gitconfig v0.1.2 // indirect
-	github.com/ulikunitz/xz v0.5.9 // indirect
 	github.com/xlab/treeprint v1.1.0 // indirect
 	go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5 // indirect
 	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd // indirect

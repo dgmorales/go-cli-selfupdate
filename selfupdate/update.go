@@ -7,22 +7,30 @@ package selfupdate
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"log"
 	"os"
+	"reflect"
+	"runtime"
+	"strings"
 
-	"github.com/blang/semver"
 	"github.com/dgmorales/go-cli-selfupdate/kube"
 	"github.com/dgmorales/go-cli-selfupdate/version"
-	"github.com/rhysd/go-github-selfupdate/selfupdate"
+	"github.com/google/go-github/v48/github"
+	semver "github.com/hashicorp/go-version"
+	"github.com/mitchellh/mapstructure"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
-type versions struct {
-	repository string
-	minimal    *semver.Version
-	latest     *semver.Version
+type cliInfo struct {
+	RepositoryOwner        string
+	RepositoryName         string
+	MinimalRequiredVersion *semver.Version
+	latestVersion          *semver.Version
+	assetName              string
+	assetUrl               string
 }
 
 type updateDecision int
@@ -33,27 +41,30 @@ const (
 	MustUpdate
 )
 
-func doSelfUpdate(repo string) {
-	if repo == "" {
-		fmt.Println("Can't update")
-		return
+// StringToVersionHookFunc is a mapstructure HookFunc to convert
+// a string to a hashicorp/go-version Version pointer
+//
+// This will be passed to mapstructure.Decoder and called for every field
+// in the source structure being mapped, so we must "passthrough" if the
+// field types don't match
+func StringToVersionHookFunc(from reflect.Type, to reflect.Type, data interface{}) (interface{}, error) {
+	if to != reflect.TypeOf(semver.Version{}) {
+		return data, nil
 	}
-	v := semver.MustParse(version.Version)
-	latest, err := selfupdate.UpdateSelf(v, repo)
+	if from.Kind() != reflect.String {
+		return data, nil
+	}
+
+	// Convert it by parsing
+	v, err := semver.NewVersion(data.(string))
 	if err != nil {
-		log.Println("Binary update failed:", err)
-		return
+		return &semver.Version{}, fmt.Errorf("failed parsing version %v", data)
 	}
-	if latest.Version.Equals(v) {
-		// latest version is the same as current version. It means current binary is up to date.
-		log.Println("Current binary is the latest version", version.Version)
-	} else {
-		log.Println("Successfully updated to version", latest.Version)
-		log.Println("Release note:\n", latest.ReleaseNotes)
-	}
+
+	return v, nil
 }
 
-// getVersionsFromConfigMap get version information from a Kubernetes ConfigMap
+// readFromCfgMap gets version information from a Kubernetes ConfigMap
 //
 // We want to continue if some of the fields of the versions ConfigMap are missing
 // We also want to continue on if there are errors on the remote specification of versions,
@@ -61,81 +72,132 @@ func doSelfUpdate(repo string) {
 // report them somwhere, so we build an error list with any error we find.
 //
 // versions returned may be a struct with only nil values if errors are found.
-func getVersionsFromConfigMap(kc *kubernetes.Clientset, ns string, name string) (versions, []error) {
-	var res versions
-	var errorList []error
+func (i *cliInfo) readFromCfgMap(kc *kubernetes.Clientset, ns string, name string) error {
+	if i == nil {
+		return errors.New("in readFromCfgMap: called with a nil receiver")
+	}
 
-	cm, err := kc.CoreV1().ConfigMaps(ns).Get(context.Background(), name, metav1.GetOptions{})
+	cm, err := kc.CoreV1().ConfigMaps(ns).Get(context.Background(), name,
+		metav1.GetOptions{})
 	if err != nil {
-		return res, append(errorList, err)
+		return fmt.Errorf("error reading configmap %s/%s: %w", ns, name, err)
 	}
 
-	if val, ok := cm.Data["repository"]; ok {
-		res.repository = val
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		DecodeHook: StringToVersionHookFunc,
+		Result:     &i,
+	})
+	if err != nil {
+		return fmt.Errorf("error parsing configmap %s/%s: %w", ns, name, err)
 	}
 
-	if val, ok := cm.Data["minimal-required-version"]; ok {
-		v, err := semver.Make(val)
-		if err != nil {
-			errorList = append(errorList, err)
-		} else {
-			res.minimal = &v
-		}
+	err = decoder.Decode(cm.Data)
+	if err != nil {
+		return fmt.Errorf("error parsing configmap %s/%s: %w", ns, name, err)
 	}
 
-	if val, ok := cm.Data["latest-version"]; ok {
-		v, err := semver.Make(val)
-		if err != nil {
-			errorList = append(errorList, err)
-		} else {
-			res.latest = &v
-		}
-	}
-
-	return res, errorList
+	return nil
 }
 
-// check checks if current version can or must be updated
+// readFromGitHub reads the latest version from GitHub Releases
 //
-// check is internal and meant to be easily testable
-// If v contains only nils, this is a noop and will return IsLatest
-func check(v versions) (updateDecision, error) {
-	res := IsLatest
-
-	curVer, err := semver.Make(version.Version)
-	if err != nil {
-		panic("This should never happen. Wrong version set internally.")
+// It also finds the correct asset to use from the release assets
+func (i *cliInfo) readFromGitHub(gh *github.Client) error {
+	if i == nil {
+		return errors.New("in readFromGitHub: called with a nil receiver")
 	}
 
-	if v.minimal != nil && curVer.Compare(*v.minimal) == -1 {
+	if i.RepositoryOwner == "" || i.RepositoryName == "" {
+		return errors.New("error getting latest github release, owner or repo are unset")
+	}
+
+	rel, _, err := gh.Repositories.GetLatestRelease(context.Background(),
+		i.RepositoryOwner, i.RepositoryName)
+	if err != nil {
+		return fmt.Errorf("error getting latest github release from repo %s/%s: %w",
+			i.RepositoryOwner, i.RepositoryName, err)
+	}
+
+	i.latestVersion, err = semver.NewVersion(rel.GetTagName())
+	if err != nil {
+		return fmt.Errorf("error parsing github release tag %s as version, from repo %s/%s: %w",
+			rel.GetTagName(), i.RepositoryOwner, i.RepositoryName, err)
+	}
+
+	// asset must contain goos string (linux|windows|darwin) on filename
+	for _, asset := range rel.Assets {
+		if strings.Contains(asset.GetName(), runtime.GOOS) {
+			i.assetName = asset.GetName()
+			i.assetUrl = asset.GetBrowserDownloadURL()
+		}
+	}
+	return nil
+}
+
+// checkVersion checks if current version can or must be updated
+//
+// check is internal and meant to be easily testable
+// It is OK for the version information on cliInfo to be unset (nil),
+// maybe because of previous errors parsing it. That is a noop and
+// will return IsLatest and nil error on that case.
+//
+// It does return error on some very abnormal cases (gross programming errors)
+func (i *cliInfo) CheckVersion() (updateDecision, error) {
+	if i == nil {
+		return IsLatest, errors.New("in checkVersion: called with a nil receiver")
+	}
+
+	current, err := semver.NewVersion(version.Version)
+	if err != nil {
+		return IsLatest, errors.New("in checkVersion: error parsing our current version. This should never happen")
+	}
+
+	err = i.readFromCfgMap(kube.Client, kube.SYSTEM_NS, "cli-info")
+	if err != nil {
+		return IsLatest, err
+	}
+
+	err = i.readFromGitHub(github.NewClient(nil))
+	if err != nil {
+		return IsLatest, err
+	}
+
+	if i.MinimalRequiredVersion != nil && current.LessThan(i.MinimalRequiredVersion) {
 		return MustUpdate, nil
 	} // ignore if minimal required version is unset
 
-	if v.latest != nil && curVer.Compare(*v.latest) == -1 {
+	if i.latestVersion != nil && current.LessThan(i.latestVersion) {
 		return CanUpdate, nil
 	} // ignore if latest version is unset
 
-	return res, nil
+	return IsLatest, nil
 }
 
-// Check checks if current version can or must be update, and interacts with the user about it
+// Check checks if current version can or must be update, and interacts with the user
+// about it
 func Check() {
-	versions, _ := getVersionsFromConfigMap(kube.Client, kube.SYSTEM_NS, "cli-info")
-	decision, _ := check(versions)
-	// For now, we will ignore errors reading the config map
-	// And that's safe:
-	// versions won't be nil, but may contain only nil values
-	// and check won't mind that.
+	i := cliInfo{}
+	decision, err := i.CheckVersion()
+	// We will just log errors below and continue, without disturbing user interaction
+	// flow. Version check and update is a non essential feature.
+	if err != nil {
+		fmt.Printf("Info: we are having some trouble checking for a new version of the CLI. Check for our log file in your %s folder\n", os.TempDir())
+		log.Println(err)
+	}
+	log.Printf("debug: cli information dump: %v\n", i)
 
 	switch decision {
 	case MustUpdate:
 		fmt.Printf("Fatal: your current version (%s) is not supported anymore (minimal: %s). You need to upgrade.\n",
-			version.Version, versions.minimal.String())
-		doSelfUpdate(versions.repository)
+			version.Version, i.MinimalRequiredVersion.String())
+		//doSelfUpdate(versions.repository)
 		// TODO: Ask permission to selfupdate instead of exiting
 		os.Exit(0)
 	case CanUpdate:
 		fmt.Printf("Warning: there's a newer version (%s), but this version (%s) is still usable.\n",
-			versions.latest.String(), version.Version)
+			i.latestVersion.String(), version.Version)
 	}
 }
+
+// func doSelfUpdate(repo string) {
+// }
