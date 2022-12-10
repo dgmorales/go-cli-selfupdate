@@ -3,8 +3,11 @@ name: Release
 on:
   push:
     branches: ["main"]
-#  pull_request:
-#    branches: [ "main" ]
+    paths-ignore:
+      - "README.md"
+      - "LICENSE"
+      - "cli-info.yml"
+      - ".gitignore"
 
 jobs:
   release:
