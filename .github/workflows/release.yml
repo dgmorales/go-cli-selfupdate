@@ -44,5 +44,5 @@ jobs:
           goarch: ${{ matrix.goarch }}
           release_tag: ${{needs.release.outputs.version}}
           md5sum: false
-          binary_name: stne
+          binary_name: go-cli-selfupdate
           asset_name: go-cli-selfupdate-${{needs.release.outputs.version}}-${{ matrix.goos }}
