@@ -31,6 +31,7 @@ type cliInfo struct {
 	MinimalRequiredVersion *semver.Version
 	latestVersion          *semver.Version
 	assetName              string
+	assetID                int64
 	assetUrl               string
 }
 
@@ -129,6 +130,7 @@ func (i *cliInfo) readFromGitHub(gh *github.Client) error {
 	for _, asset := range rel.Assets {
 		if strings.Contains(asset.GetName(), runtime.GOOS) {
 			i.assetName = asset.GetName()
+			i.assetID = asset.GetID()
 			i.assetUrl = asset.GetBrowserDownloadURL()
 		}
 	}
@@ -143,10 +145,7 @@ func (i *cliInfo) readFromGitHub(gh *github.Client) error {
 // will return IsLatest and nil error on that case.
 //
 // It does return error on some very abnormal cases (gross programming errors)
-func (i *cliInfo) CheckVersion() (updateDecision, error) {
-	if i == nil {
-		return IsLatest, errors.New("in checkVersion: called with a nil receiver")
-	}
+func checkVersion(i *cliInfo, gh *github.Client) (updateDecision, error) {
 
 	current, err := semver.NewVersion(version.Version)
 	if err != nil {
@@ -158,7 +157,7 @@ func (i *cliInfo) CheckVersion() (updateDecision, error) {
 		return IsLatest, err
 	}
 
-	err = i.readFromGitHub(github.NewClient(nil))
+	err = i.readFromGitHub(gh)
 	if err != nil {
 		return IsLatest, err
 	}
@@ -178,7 +177,8 @@ func (i *cliInfo) CheckVersion() (updateDecision, error) {
 // about it
 func Check() {
 	i := cliInfo{}
-	decision, err := i.CheckVersion()
+	gh := github.NewClient(nil)
+	decision, err := checkVersion(&i, gh)
 	// We will just log errors below and continue, without disturbing user interaction
 	// flow. Version check and update is a non essential feature.
 	if err != nil {
@@ -189,16 +189,13 @@ func Check() {
 
 	switch decision {
 	case MustUpdate:
-		fmt.Printf("Fatal: your current version (%s) is not supported anymore (minimal: %s). You need to upgrade.\n",
+		fmt.Printf("Warning: your current version (%s) is not supported anymore (minimal: %s). You need to upgrade.\n",
 			version.Version, i.MinimalRequiredVersion.String())
-		//doSelfUpdate(versions.repository)
-		// TODO: Ask permission to selfupdate instead of exiting
+		// TODO: Ask permission to selfupdate before proceding?
+		DownloadAndApply(i, gh)
 		os.Exit(0)
 	case CanUpdate:
 		fmt.Printf("Warning: there's a newer version (%s), but this version (%s) is still usable.\n",
 			i.latestVersion.String(), version.Version)
 	}
 }
-
-// func doSelfUpdate(repo string) {
-// }

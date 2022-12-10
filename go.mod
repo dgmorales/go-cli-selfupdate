@@ -6,6 +6,7 @@ require (
 	github.com/Code-Hex/Neo-cowsay/v2 v2.0.4
 	github.com/google/go-github/v48 v48.1.0
 	github.com/hashicorp/go-version v1.6.0
+	github.com/minio/selfupdate v0.5.0
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/spf13/cobra v1.6.1
 	k8s.io/apimachinery v0.25.4
