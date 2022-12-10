@@ -20,7 +20,7 @@ func NewClient() *github.Client {
 }
 
 // downloadAsset saves a GitHub Release Asset to a temporary file
-func downloadAsset(i cliInfo, gh *github.Client) (filename string, err error) {
+func downloadAsset(i CliInfo, gh *github.Client) (filename string, err error) {
 	var httpClient http.Client
 
 	if i.assetName == "" || i.assetID == 0 || i.assetUrl == "" {
@@ -52,7 +52,7 @@ func downloadAsset(i cliInfo, gh *github.Client) (filename string, err error) {
 	return filename, nil
 }
 
-func DownloadAndApply(i cliInfo, gh *github.Client) {
+func DownloadAndApply(i CliInfo, gh *github.Client) {
 	fmt.Println("Downloading latest release ...")
 
 	filename, err := downloadAsset(i, gh)

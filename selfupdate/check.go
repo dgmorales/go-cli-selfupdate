@@ -9,14 +9,11 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"log"
-	"os"
 	"reflect"
 	"runtime"
 	"strings"
 
 	"github.com/dgmorales/go-cli-selfupdate/kube"
-	"github.com/dgmorales/go-cli-selfupdate/logger"
 	"github.com/dgmorales/go-cli-selfupdate/version"
 	"github.com/google/go-github/v48/github"
 	semver "github.com/hashicorp/go-version"
@@ -25,22 +22,26 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-type cliInfo struct {
+type CliInfo struct {
 	RepositoryOwner        string
 	RepositoryName         string
 	MinimalRequiredVersion *semver.Version
-	latestVersion          *semver.Version
+	LatestVersion          *semver.Version
 	assetName              string
 	assetID                int64
 	assetUrl               string
 }
 
+// updateDecision informs if our version is latest, can or must update.
+//
+// Its values may be used as shell exit status codes for a version check command.
 type updateDecision int
 
+// won't use iota bellow because values matter
 const (
-	IsLatest updateDecision = iota
-	CanUpdate
-	MustUpdate
+	IsLatest   updateDecision = 0
+	CanUpdate  updateDecision = 1
+	MustUpdate updateDecision = 2
 )
 
 // StringToVersionHookFunc is a mapstructure HookFunc to convert
@@ -74,7 +75,7 @@ func StringToVersionHookFunc(from reflect.Type, to reflect.Type, data interface{
 // report them somwhere, so we build an error list with any error we find.
 //
 // versions returned may be a struct with only nil values if errors are found.
-func (i *cliInfo) readFromCfgMap(kc *kubernetes.Clientset, ns string, name string) error {
+func (i *CliInfo) readFromCfgMap(kc *kubernetes.Clientset, ns string, name string) error {
 	if i == nil {
 		return errors.New("in readFromCfgMap: called with a nil receiver")
 	}
@@ -104,7 +105,7 @@ func (i *cliInfo) readFromCfgMap(kc *kubernetes.Clientset, ns string, name strin
 // readFromGitHub reads the latest version from GitHub Releases
 //
 // It also finds the correct asset to use from the release assets
-func (i *cliInfo) readFromGitHub(gh *github.Client) error {
+func (i *CliInfo) readFromGitHub(gh *github.Client) error {
 	if i == nil {
 		return errors.New("in readFromGitHub: called with a nil receiver")
 	}
@@ -120,7 +121,7 @@ func (i *cliInfo) readFromGitHub(gh *github.Client) error {
 			i.RepositoryOwner, i.RepositoryName, err)
 	}
 
-	i.latestVersion, err = semver.NewVersion(rel.GetTagName())
+	i.LatestVersion, err = semver.NewVersion(rel.GetTagName())
 	if err != nil {
 		return fmt.Errorf("error parsing github release tag %s as version, from repo %s/%s: %w",
 			rel.GetTagName(), i.RepositoryOwner, i.RepositoryName, err)
@@ -145,7 +146,7 @@ func (i *cliInfo) readFromGitHub(gh *github.Client) error {
 // will return IsLatest and nil error on that case.
 //
 // It does return error on some very abnormal cases (gross programming errors)
-func checkVersion(i *cliInfo, gh *github.Client) (updateDecision, error) {
+func Check(i *CliInfo, gh *github.Client) (updateDecision, error) {
 
 	current, err := semver.NewVersion(version.Version)
 	if err != nil {
@@ -166,36 +167,9 @@ func checkVersion(i *cliInfo, gh *github.Client) (updateDecision, error) {
 		return MustUpdate, nil
 	} // ignore if minimal required version is unset
 
-	if i.latestVersion != nil && current.LessThan(i.latestVersion) {
+	if i.LatestVersion != nil && current.LessThan(i.LatestVersion) {
 		return CanUpdate, nil
 	} // ignore if latest version is unset
 
 	return IsLatest, nil
-}
-
-// Check checks if current version can or must be update, and interacts with the user
-// about it
-func Check() {
-	i := cliInfo{}
-	gh := github.NewClient(nil)
-	decision, err := checkVersion(&i, gh)
-	// We will just log errors below and continue, without disturbing user interaction
-	// flow. Version check and update is a non essential feature.
-	if err != nil {
-		fmt.Printf("Info: we are having some trouble checking for a new version of the CLI. Check details on logfile %s\n", logger.LogFile)
-		log.Println(err)
-	}
-	log.Printf("debug: cli information dump: %v\n", i)
-
-	switch decision {
-	case MustUpdate:
-		fmt.Printf("Warning: your current version (%s) is not supported anymore (minimal: %s). You need to upgrade.\n",
-			version.Version, i.MinimalRequiredVersion.String())
-		// TODO: Ask permission to selfupdate before proceding?
-		DownloadAndApply(i, gh)
-		os.Exit(0)
-	case CanUpdate:
-		fmt.Printf("Warning: there's a newer version (%s), but this version (%s) is still usable.\n",
-			i.latestVersion.String(), version.Version)
-	}
 }
