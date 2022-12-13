@@ -32,16 +32,16 @@ type CliInfo struct {
 	assetUrl               string
 }
 
-// updateDecision informs if our version is latest, can or must update.
+// UpdateDecision informs if our version is latest, can or must update.
 //
 // Its values may be used as shell exit status codes for a version check command.
-type updateDecision int
+type UpdateDecision int
 
 // won't use iota bellow because values matter
 const (
-	IsLatest   updateDecision = 0
-	CanUpdate  updateDecision = 1
-	MustUpdate updateDecision = 2
+	IsLatest   UpdateDecision = 0
+	CanUpdate  UpdateDecision = 10
+	MustUpdate UpdateDecision = 20
 )
 
 // StringToVersionHookFunc is a mapstructure HookFunc to convert
@@ -146,7 +146,7 @@ func (i *CliInfo) readFromGitHub(gh *github.Client) error {
 // will return IsLatest and nil error on that case.
 //
 // It does return error on some very abnormal cases (gross programming errors)
-func Check(i *CliInfo, gh *github.Client) (updateDecision, error) {
+func Check(i *CliInfo, gh *github.Client) (UpdateDecision, error) {
 
 	current, err := semver.NewVersion(version.Version)
 	if err != nil {

@@ -4,6 +4,6 @@ metadata:
   name: cli-info
   namespace: sreplatform-system
 data:
-  MinimalRequiredVersion: 0.1.0
+  MinimalRequiredVersion: 0.2.0
   RepositoryOwner: dgmorales
   RepositoryName: go-cli-selfupdate

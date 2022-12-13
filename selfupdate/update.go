@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path"
@@ -52,30 +53,26 @@ func downloadAsset(i CliInfo, gh *github.Client) (filename string, err error) {
 	return filename, nil
 }
 
-func DownloadAndApply(i CliInfo, gh *github.Client) {
-	fmt.Println("Downloading latest release ...")
-
+func DownloadAndApply(i CliInfo, gh *github.Client) error {
 	filename, err := downloadAsset(i, gh)
 
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
-	fmt.Printf("Downloaded %s\n ...", filename)
+	log.Printf("Downloaded %s\n ...", filename)
 	reader, closer, err := Uncompress(filename)
 	if err != nil {
-		fmt.Println(err)
 		if closer != nil {
 			closer()
 		}
-		os.Exit(1)
+		return err
 	}
 
 	err = minioSelfUpdate.Apply(reader, minioSelfUpdate.Options{})
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
+	return nil
 }

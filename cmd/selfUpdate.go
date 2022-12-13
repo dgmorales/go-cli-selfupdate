@@ -43,8 +43,17 @@ CanUpdate  = 1
 MustUpdate = 2
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("self-update called with check:%t yes:%t\n", flagCheck, flagYes)
-		versionCheck()
+		decision := versionCheck()
+		if flagCheck {
+			os.Exit(int(decision))
+		}
+
+		if decision == selfupdate.CanUpdate {
+			// TODO: needs to fix confirmAndUpdate signature
+			fmt.Printf("will ask for update\n")
+		}
+
+		os.Exit(0)
 	},
 }
 
@@ -57,7 +66,7 @@ func init() {
 
 // Check checks if current version can or must be update, and interacts with the user
 // about it
-func versionCheck() {
+func versionCheck() selfupdate.UpdateDecision {
 	i := selfupdate.CliInfo{}
 	gh := github.NewClient(nil)
 	decision, err := selfupdate.Check(&i, gh)
@@ -74,27 +83,48 @@ func versionCheck() {
 		fmt.Printf("Warning: your current version (%s) is not supported anymore (minimal: %s, latest: %s). You need to update it.\n",
 			version.Version, i.MinimalRequiredVersion.String(), i.LatestVersion.String())
 
-		if !flagCheck && (flagYes || askIfUpdate()) {
-			selfupdate.DownloadAndApply(i, gh)
-		} else {
-			fmt.Println("Exiting without updating.")
-			os.Exit(int(selfupdate.MustUpdate))
-		}
-		os.Exit(0)
+		confirmAndUpdate(decision, i, gh)
 
 	case selfupdate.CanUpdate:
-		fmt.Printf("Warning: there's a newer version (%s), but this version (%s) is still usable.\n",
-			i.LatestVersion.String(), version.Version)
+		fmt.Printf("Warning: there's a newer version (%s), but this version (%s) is still usable. You can update it by running %s self-update.\n",
+			i.LatestVersion.String(), version.Version, os.Args[0])
+
+		// UX decision: do not ask the user for update if it is not required. Just warns.
 	}
 
-	// if flagCheck is true, then we are running from cmd self-update --check
-	// and our work is done. We should exit and status code must reflect decision.
-	if flagCheck {
-		os.Exit(int(decision))
-	}
-
+	return decision
 }
 
+// confirmAndUpdate will confirms if we can proceed with the self-update,
+// and performs the update if confirmed.
+//
+// It will ask the user, check for --yes flags, etc.
+//
+// If the update is **not required** and not performed this function returns.
+// Otherwise this function assures the program is terminated.
+func confirmAndUpdate(d selfupdate.UpdateDecision, i selfupdate.CliInfo, gh *github.Client) {
+	if !flagYes && !askIfUpdate() {
+		if d == selfupdate.MustUpdate {
+			fmt.Println("Cannot continue without updating. Exiting.")
+			os.Exit(int(d))
+		} else {
+			// Update is optional, let the program continue
+			return
+		}
+	}
+
+	fmt.Println("Downloading and applying latest release ...")
+	err := selfupdate.DownloadAndApply(i, gh)
+	if err != nil {
+		fmt.Printf("Error: %s", err.Error())
+		os.Exit(1)
+	}
+
+	// Terminate to force the user to load the updated binary
+	os.Exit(0)
+}
+
+// askIfUpdate will ask the user if we should update now
 func askIfUpdate() bool {
 	ans := false
 	prompt := &survey.Confirm{
