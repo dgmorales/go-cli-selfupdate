@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cli-config
+  namespace: myk8sapi-system
+data:
+  MinimalRequiredVersion: 0.2.0
+  RepoOwner: dgmorales
+  RepoName: go-cli-selfupdate-private

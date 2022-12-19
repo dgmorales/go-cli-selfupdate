@@ -2,6 +2,7 @@ package start
 
 import (
 	"github.com/dgmorales/go-cli-selfupdate/config"
+	"github.com/dgmorales/go-cli-selfupdate/gh"
 	"github.com/dgmorales/go-cli-selfupdate/kube"
 	"github.com/dgmorales/go-cli-selfupdate/version"
 	"github.com/google/go-github/v48/github"
@@ -20,7 +21,10 @@ func ForAPIUse() (State, error) {
 	var err error
 	s := State{}
 
-	s.Github = github.NewClient(nil)
+	s.Github, err = gh.NewClient()
+	if err != nil {
+		return State{}, err
+	}
 
 	s.Kube, err = kube.NewClient()
 	if err != nil {
@@ -38,6 +42,7 @@ func ForAPIUse() (State, error) {
 	}
 
 	s.Version, err = version.NewGithubChecker(
+		s.Github,
 		s.ServerCfg.RepoOwner,
 		s.ServerCfg.RepoName,
 		s.ServerCfg.MinimalRequiredVersion,

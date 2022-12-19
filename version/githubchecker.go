@@ -22,6 +22,7 @@ import (
 )
 
 type GitHubChecker struct {
+	client    *github.Client
 	minimal   *semver.Version
 	current   *semver.Version
 	latest    *semver.Version
@@ -35,7 +36,7 @@ type GitHubChecker struct {
 // DiscoverLatest discovers what is the latest version from GitHub Releases
 //
 // It already saves asset information, leaving everything ready for calling Download()
-func NewGithubChecker(owner string, repo string, minimalReq string, current string) (*GitHubChecker, error) {
+func NewGithubChecker(client *github.Client, owner string, repo string, minimalReq string, current string) (*GitHubChecker, error) {
 	var err error
 	ghc := GitHubChecker{}
 
@@ -57,9 +58,13 @@ func NewGithubChecker(owner string, repo string, minimalReq string, current stri
 		}
 	}
 
-	gh := github.NewClient(nil)
+	if client == nil {
+		ghc.client = github.NewClient(nil)
+	} else {
+		ghc.client = client
+	}
 
-	latest, _, err := gh.Repositories.GetLatestRelease(context.Background(), owner, repo)
+	latest, _, err := ghc.client.Repositories.GetLatestRelease(context.Background(), owner, repo)
 	if err != nil {
 		return nil, fmt.Errorf("error getting latest github release from repo %s/%s: %w",
 			owner, repo, err)
@@ -122,9 +127,7 @@ func (c *GitHubChecker) DownloadLatest() (filename string, err error) {
 	}
 	defer f.Close()
 
-	gh := github.NewClient(nil)
-
-	data, redirectUrl, err := gh.Repositories.DownloadReleaseAsset(context.Background(),
+	data, redirectUrl, err := c.client.Repositories.DownloadReleaseAsset(context.Background(),
 		c.repoOwner, c.repoName, c.assetID, &httpClient)
 	if redirectUrl != "" {
 		return filename, fmt.Errorf("in Download: got unsupported asset redirect URL (%s)", redirectUrl)
