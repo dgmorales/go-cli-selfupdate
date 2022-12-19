@@ -9,4 +9,26 @@ import (
 )
 
 //go:embed version.txt
-var Version string
+var Current string
+
+// Assertion informs if our version is latest, can or must update.
+//
+// Its values may be used as shell exit status codes for a version check command.
+type Assertion int
+
+// won't use iota bellow because values matter for use as exit codes
+// Avoid using 1 and 2 that are frequently used as more general error exit codes for
+// commands: https://tldp.org/LDP/abs/html/exitcodes.html
+const (
+	IsLatest   Assertion = 0
+	CanUpdate  Assertion = 10
+	MustUpdate Assertion = 20
+)
+
+type Checker interface {
+	Minimal() string
+	Current() string
+	Latest() string
+	Check() (Assertion, error)
+	DownloadLatest() (filename string, err error)
+}

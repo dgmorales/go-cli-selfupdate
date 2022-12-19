@@ -21,7 +21,7 @@ var rootCmd = &cobra.Command{
 The twist is about interacting with the kubernetes API.
 In this test, we will get version information from a ConfigMap
 stored in kubernetes.`,
-	Version: version.Version,
+	Version: version.Current,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	// Run: func(cmd *cobra.Command, args []string) { },

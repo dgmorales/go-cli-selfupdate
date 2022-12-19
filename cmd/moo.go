@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	cowsay "github.com/Code-Hex/Neo-cowsay/v2"
+	"github.com/dgmorales/go-cli-selfupdate/start"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +22,8 @@ var mooCmd = &cobra.Command{
 Cowsaying is fun. What's more to say?
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		versionCheck()
+		// we need no state at all on this command
+		start.ForLocalUse()
 
 		say := "moo"
 		if len(args) > 0 {

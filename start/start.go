@@ -1,0 +1,55 @@
+package start
+
+import (
+	"github.com/dgmorales/go-cli-selfupdate/config"
+	"github.com/dgmorales/go-cli-selfupdate/kube"
+	"github.com/dgmorales/go-cli-selfupdate/version"
+	"github.com/google/go-github/v48/github"
+	"k8s.io/client-go/kubernetes"
+)
+
+type State struct {
+	Version     version.Checker
+	ServerCfg   config.ServerSideConfig
+	Kube        *kubernetes.Clientset
+	Github      *github.Client
+	ssCfgLoader config.ServerSideConfigLoader
+}
+
+func ForAPIUse() (State, error) {
+	var err error
+	s := State{}
+
+	s.Github = github.NewClient(nil)
+
+	s.Kube, err = kube.NewClient()
+	if err != nil {
+		return State{}, err
+	}
+
+	s.ssCfgLoader, err = config.NewKubeSSCfgLoader(s.Kube, "", "")
+	if err != nil {
+		return State{}, err
+	}
+
+	s.ServerCfg, err = s.ssCfgLoader.Load()
+	if err != nil {
+		return State{}, err
+	}
+
+	s.Version, err = version.NewGithubChecker(
+		s.ServerCfg.RepoOwner,
+		s.ServerCfg.RepoName,
+		s.ServerCfg.MinimalRequiredVersion,
+		version.Current)
+	if err != nil {
+		return State{}, err
+	}
+
+	return s, nil
+}
+
+func ForLocalUse() (*State, error) {
+	s := State{}
+	return &s, nil
+}
