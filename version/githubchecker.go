@@ -111,9 +111,13 @@ func (c *GitHubChecker) Latest() string {
 	return c.latest.String()
 }
 
-// Download downloads the saved GitHub Release Asset to a temporary file
+// DownloadLatest downloads the saved GitHub Release Asset to a temporary file
 func (c *GitHubChecker) DownloadLatest() (filename string, err error) {
 	var httpClient http.Client
+
+	if c == nil {
+		return "", fmt.Errorf("in GitHubChecker.DownloadLatest: called with nil receiver")
+	}
 
 	if c.assetName == "" || c.assetID == 0 || c.assetUrl == "" {
 		return "", errors.New("in Download: github release asset information is unavailable")
@@ -146,16 +150,11 @@ func (c *GitHubChecker) DownloadLatest() (filename string, err error) {
 
 // Check checks if current version can or must be updated
 //
-// It is OK for the version information on cliInfo to be unset (nil),
-// maybe because of previous errors parsing it. That is a noop and
-// will return IsLatest and nil error on that case.
-//
 // It does return error on some very abnormal cases (gross programming errors)
 func (c *GitHubChecker) Check() (Assertion, error) {
-	// current, err := semver.NewVersion(Version)
-	// if err != nil {
-	// 	return IsLatest, errors.New("in checkVersion: error parsing our current version. This should never happen")
-	// }
+	if c == nil {
+		return IsLatest, fmt.Errorf("in GitHubChecker.Check: called with nil receiver")
+	}
 
 	if c.minimal != nil && c.current.LessThan(c.minimal) {
 		return MustUpdate, nil

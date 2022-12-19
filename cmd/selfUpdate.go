@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 NAME HERE <EMAIL ADDRESS>
+Copyright © 2022 Diego Morales <dgmorales@gmail.com>
 
 */
 package cmd
@@ -36,11 +36,11 @@ In any case, the CLI will exit after the apply and you will need to call it agai
 load the binary with the new version.
 
 You may run this command with --check for just checking if an update is available or
-required. Exit code will reflect the update decision:
+required. Exit code will reflect the version state:
 
 IsLatest   = 0
-CanUpdate  = 1
-MustUpdate = 2
+CanUpdate  = 10
+MustUpdate = 20
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		state, err := start.ForAPIUse()
@@ -74,10 +74,10 @@ func init() {
 	selfUpdateCmd.Flags().BoolVarP(&flagYes, "yes", "y", false, "Don't ask before changing your system. Assume yes.")
 }
 
-// Check checks if current version can or must be update, and interacts with the user
+// versionCheck checks if current version can or must be updated, and interacts with the user
 // about it
 func versionCheck(v version.Checker) version.Assertion {
-	decision, err := v.Check()
+	ans, err := v.Check()
 	// We will just log errors below and continue, without disturbing user interaction
 	// flow. Version check and update is a non essential feature.
 	if err != nil {
@@ -86,13 +86,13 @@ func versionCheck(v version.Checker) version.Assertion {
 	}
 	log.Printf("debug: cli information dump: %v\n", v)
 
-	switch decision {
+	switch ans {
 	case version.MustUpdate:
 		fmt.Printf("Warning: your current version (%s) is not supported anymore (minimal: %s, latest: %s). You need to update it.\n",
 			v.Current(), v.Minimal(), v.Latest())
 
 		if !flagCheck {
-			confirmAndUpdate(decision, v)
+			confirmAndUpdate(ans, v)
 		}
 
 	case version.CanUpdate:
@@ -101,7 +101,7 @@ func versionCheck(v version.Checker) version.Assertion {
 		// UX decision: just warns, and do not ask the user for update if it is not required.
 	}
 
-	return decision
+	return ans
 }
 
 // confirmAndUpdate will confirms if we can proceed with the self-update,
@@ -110,12 +110,12 @@ func versionCheck(v version.Checker) version.Assertion {
 // It will ask the user, check for --yes flags, etc.
 //
 // If the update is **not required** and not performed this function returns.
-// Otherwise this function assures the program is terminated.
-func confirmAndUpdate(d version.Assertion, v version.Checker) {
+// Otherwise this function ensures the program is terminated.
+func confirmAndUpdate(a version.Assertion, v version.Checker) {
 	if !flagYes && !askIfUpdate() {
-		if d == version.MustUpdate {
+		if a == version.MustUpdate {
 			fmt.Println("Cannot continue without updating. Exiting.")
-			os.Exit(int(d))
+			os.Exit(int(a))
 		} else {
 			// Update is optional, let the program continue
 			return

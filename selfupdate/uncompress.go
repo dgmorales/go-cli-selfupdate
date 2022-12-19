@@ -35,11 +35,12 @@ func untarGzSingleFileReader(filename string) (r io.Reader, closer func(), err e
 		f.Close()
 	}
 
-	// Create a new tar reader
 	tarReader := tar.NewReader(gzipReader)
 
-	// Iterate through the files in the tar archive
-	header, err := tarReader.Next()
+	// Get the first file in the tar archive, and ignore the rest
+	// we could improve this by making it sure there's only 1 file as expected, erroring
+	// out if not.
+	_, err = tarReader.Next()
 	if err == io.EOF {
 		return nil, closer, errors.New("in untarGzSingleFileReader: empty tar file")
 	}
@@ -47,8 +48,6 @@ func untarGzSingleFileReader(filename string) (r io.Reader, closer func(), err e
 		return nil, closer, err
 	}
 
-	// Print the file name
-	fmt.Println(header.Name)
 	return tarReader, closer, nil
 }
 
@@ -71,11 +70,13 @@ func unzipSingleFileReader(filename string) (r io.Reader, closer func(), err err
 		return nil, nil, err
 	}
 
+	// We ensure there's only one file in the archive, as expected
 	if len(zipReader.File) != 1 {
 		f.Close()
 		return nil, nil, fmt.Errorf("in unzipSingleFileReader: zip file should contain exactly 1 file. It contains %d", len(zipReader.File))
 	}
 
+	// Get the first file in the zip archive, and ignore the rest
 	zippedFile, err := zipReader.File[0].Open()
 	if err != nil {
 		f.Close()

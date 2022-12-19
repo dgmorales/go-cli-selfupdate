@@ -22,9 +22,6 @@ The twist is about interacting with the kubernetes API.
 In this test, we will get version information from a ConfigMap
 stored in kubernetes.`,
 	Version: version.Current,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -37,14 +34,6 @@ func Execute() {
 }
 
 func init() {
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.go-cli-selfupdate.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
 
 	kube.Flags.AddFlags(rootCmd.PersistentFlags())
 }

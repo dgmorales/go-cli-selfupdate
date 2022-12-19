@@ -10,7 +10,7 @@ import (
 var WorkDir = path.Join(os.TempDir(), "go-cli-selfupdate")
 var LogFile string
 
-// setUp sets up error logging by creating logfiles, configuring log lib, etc.
+// SetUp sets up error logging by creating logfiles, configuring log lib, etc.
 func SetUp() (*os.File, error) {
 	err := os.MkdirAll(WorkDir, 0755)
 	if err != nil {
