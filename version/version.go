@@ -23,12 +23,14 @@ const (
 	IsLatest   Assertion = 0
 	CanUpdate  Assertion = 10
 	MustUpdate Assertion = 20
+	IsBeyond   Assertion = 30  // Beyond current version: development version
+	IsUnknown  Assertion = 60
 )
 
 type Checker interface {
 	Minimal() string
 	Current() string
 	Latest() string
-	Check() (Assertion, error)
+	Check() (Assertion)
 	DownloadLatest() (filename string, err error)
 }

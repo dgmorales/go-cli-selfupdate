@@ -6,11 +6,9 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/dgmorales/go-cli-selfupdate/logger"
 	"github.com/dgmorales/go-cli-selfupdate/selfupdate"
 	"github.com/dgmorales/go-cli-selfupdate/start"
 	"github.com/dgmorales/go-cli-selfupdate/version"
@@ -77,14 +75,7 @@ func init() {
 // versionCheck checks if current version can or must be updated, and interacts with the user
 // about it
 func versionCheck(v version.Checker) version.Assertion {
-	ans, err := v.Check()
-	// We will just log errors below and continue, without disturbing user interaction
-	// flow. Version check and update is a non essential feature.
-	if err != nil {
-		fmt.Printf("Info: we are having some trouble checking for a new version of the CLI. Check details on logfile %s\n", logger.LogFile)
-		log.Println(err)
-	}
-	log.Printf("debug: cli information dump: %v\n", v)
+	ans := v.Check()
 
 	switch ans {
 	case version.MustUpdate:
@@ -99,6 +90,13 @@ func versionCheck(v version.Checker) version.Assertion {
 		fmt.Printf("Warning: there's a newer version (%s), but this version (%s) is still usable. You can update it by running %s self-update.\n",
 			v.Latest(), v.Current(), os.Args[0])
 		// UX decision: just warns, and do not ask the user for update if it is not required.
+
+	case version.IsBeyond:
+		fmt.Printf("Warning: your are using a development version (current %s > latest release %s).\n",
+			v.Current(), v.Latest())
+
+	case version.IsUnknown:
+		fmt.Println("Warning: couldn't check if you are running the latest (or minimal) version.")
 	}
 
 	return ans

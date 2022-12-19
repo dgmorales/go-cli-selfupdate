@@ -148,21 +148,37 @@ func (c *GitHubChecker) DownloadLatest() (filename string, err error) {
 	return filename, nil
 }
 
-// Check checks if current version can or must be updated
+// Check discovers if the current version can or must be updated.
 //
-// It does return error on some very abnormal cases (gross programming errors)
-func (c *GitHubChecker) Check() (Assertion, error) {
-	if c == nil {
-		return IsLatest, fmt.Errorf("in GitHubChecker.Check: called with nil receiver")
+// More precisely, it checks in which version.Assertion case the current version falls
+// in.
+//
+// It tries to be resilient and always return the best assertion it can about the
+// current version. So for example, if the minimal version is unknown it will ignore
+// that check and check against the latest.
+//
+// If it cannot tell anything, it returns is IsUnknown.
+func (c *GitHubChecker) Check() (Assertion) {
+	if c == nil || c.current == nil {
+		// return now otherwise we would panic trying the comparisons bellow
+		return IsUnknown
+	}
+
+	if c.latest != nil && c.current.Equal(c.latest) {
+		return IsLatest
 	}
 
 	if c.minimal != nil && c.current.LessThan(c.minimal) {
-		return MustUpdate, nil
-	} // ignore if minimal required version is unset
+		return MustUpdate
+	}
 
 	if c.latest != nil && c.current.LessThan(c.latest) {
-		return CanUpdate, nil
-	} // ignore if latest version is unset
+		return CanUpdate
+	}
 
-	return IsLatest, nil
+	if c.latest != nil && c.current.GreaterThan(c.latest) {
+		return IsBeyond
+	}
+
+	return IsUnknown
 }
