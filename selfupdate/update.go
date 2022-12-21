@@ -13,6 +13,7 @@ func Apply(filename string) error {
 		}
 		return err
 	}
+	defer closer()
 
 	err = minioSelfUpdate.Apply(reader, minioSelfUpdate.Options{})
 	if err != nil {
