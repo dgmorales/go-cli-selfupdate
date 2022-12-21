@@ -114,10 +114,9 @@ func confirmAndUpdate(a version.Assertion, v version.Checker) {
 		if a == version.MustUpdate {
 			fmt.Println("Cannot continue without updating. Exiting.")
 			os.Exit(int(a))
-		} else {
-			// Update is optional, let the program continue
-			return
 		}
+		// Update is optional, let the program continue
+		return
 	}
 
 	fmt.Println("Downloading and applying latest release ...")
