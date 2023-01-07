@@ -1,7 +1,3 @@
-/*
-Copyright © 2022 Diego Morales <dgmorales@gmail.com>
-
-*/
 package version
 
 import (
@@ -10,13 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 
-	"github.com/dgmorales/go-cli-selfupdate/logger"
 	"github.com/google/go-github/v48/github"
 	semver "github.com/hashicorp/go-version"
 )
@@ -30,7 +27,6 @@ type GitHubChecker struct {
 	repoName  string
 	assetName string
 	assetID   int64
-	assetUrl  string
 }
 
 // DiscoverLatest discovers what is the latest version from GitHub Releases
@@ -66,8 +62,26 @@ func NewGithubChecker(client *github.Client, owner string, repo string, minimalR
 
 	latest, _, err := ghc.client.Repositories.GetLatestRelease(context.Background(), owner, repo)
 	if err != nil {
-		return nil, fmt.Errorf("error getting latest github release from repo %s/%s: %w",
-			owner, repo, err)
+		// This special handling bellow with error.As is necessary because we want to log
+		// the error message, and that triggers a weird bug with github.ErrorResponse
+		// wrapping and go-github-mock.
+		//
+		// There is an issue open there (with no solution at the time of this writing):
+		// https://github.com/migueleliasweb/go-github-mock/issues/6
+		var ghErr *github.ErrorResponse
+		var errStr string
+
+		if errors.As(err, &ghErr) {
+			errStr = ghErr.Message
+		} else {
+			errStr = err.Error()
+		}
+
+		// We won't error if we can't get the latest version.
+		// Instead we will proceed without the latest version (and assets) info
+		log.Printf("error getting latest github release from repo %s/%s: %s. Will ignore and continue with latest version as unknown",
+			owner, repo, errStr)
+		return &ghc, nil
 	}
 
 	ghc.latest, err = semver.NewSemver(latest.GetTagName())
@@ -80,7 +94,6 @@ func NewGithubChecker(client *github.Client, owner string, repo string, minimalR
 		if strings.Contains(asset.GetName(), runtime.GOOS) {
 			ghc.assetName = asset.GetName()
 			ghc.assetID = asset.GetID()
-			ghc.assetUrl = asset.GetBrowserDownloadURL()
 		}
 	}
 
@@ -97,7 +110,7 @@ func (c *GitHubChecker) Current() string {
 
 // Minimal returns minimal required version as string
 func (c *GitHubChecker) Minimal() string {
-	if c == nil {
+	if c == nil || c.minimal == nil {
 		return ""
 	}
 	return c.minimal.String()
@@ -111,6 +124,17 @@ func (c *GitHubChecker) Latest() string {
 	return c.latest.String()
 }
 
+func openFileForDownload(name string) (filename string, fd *os.File, err error) {
+	filename = path.Join(os.TempDir(), fmt.Sprintf("%s-%s", filepath.Base(os.Args[0]), name))
+
+	fd, err = os.Create(filename)
+	if err != nil {
+		return filename, nil, fmt.Errorf("error creating file for release download: %w", err)
+	}
+
+	return filename, fd, nil
+}
+
 // DownloadLatest downloads the saved GitHub Release Asset to a temporary file
 func (c *GitHubChecker) DownloadLatest() (filename string, err error) {
 	var httpClient http.Client
@@ -119,15 +143,13 @@ func (c *GitHubChecker) DownloadLatest() (filename string, err error) {
 		return "", fmt.Errorf("in GitHubChecker.DownloadLatest: called with nil receiver")
 	}
 
-	if c.assetName == "" || c.assetID == 0 || c.assetUrl == "" {
+	if c.assetName == "" || c.assetID == 0 {
 		return "", errors.New("in Download: github release asset information is unavailable")
 	}
 
-	filename = path.Join(logger.WorkDir, c.assetName)
-
-	f, err := os.Create(filename)
+	filename, f, err := openFileForDownload(c.assetName)
 	if err != nil {
-		return "", fmt.Errorf("error creating file for release download: %w", err)
+		return filename, err
 	}
 	defer f.Close()
 
@@ -158,7 +180,7 @@ func (c *GitHubChecker) DownloadLatest() (filename string, err error) {
 // that check and check against the latest.
 //
 // If it cannot tell anything, it returns is IsUnknown.
-func (c *GitHubChecker) Check() (Assertion) {
+func (c *GitHubChecker) Check() Assertion {
 	if c == nil || c.current == nil {
 		// return now otherwise we would panic trying the comparisons bellow
 		return IsUnknown
