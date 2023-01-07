@@ -4,6 +4,7 @@ import (
 	"github.com/dgmorales/go-cli-selfupdate/config"
 	"github.com/dgmorales/go-cli-selfupdate/gh"
 	"github.com/dgmorales/go-cli-selfupdate/kube"
+	"github.com/dgmorales/go-cli-selfupdate/logger"
 	"github.com/dgmorales/go-cli-selfupdate/version"
 	"github.com/google/go-github/v48/github"
 	"k8s.io/client-go/kubernetes"
@@ -17,8 +18,10 @@ type State struct {
 	ssCfgLoader config.ServerSideConfigLoader
 }
 
-func ForAPIUse() (State, error) {
+func ForAPIUse(debug bool) (State, error) {
 	var err error
+
+	logger.SetUp(debug)
 	s := State{}
 
 	s.Github, err = gh.NewClient()
@@ -54,7 +57,8 @@ func ForAPIUse() (State, error) {
 	return s, nil
 }
 
-func ForLocalUse() (*State, error) {
+func ForLocalUse(debug bool) (*State, error) {
+	logger.SetUp(debug)
 	s := State{}
 	return &s, nil
 }

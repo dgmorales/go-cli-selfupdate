@@ -41,7 +41,7 @@ CanUpdate  = 10
 MustUpdate = 20
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		state, err := start.ForAPIUse()
+		state, err := start.ForAPIUse(flagDebug)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)

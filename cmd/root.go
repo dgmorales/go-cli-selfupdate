@@ -12,6 +12,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var flagDebug bool
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "go-cli-selfupdate",
@@ -36,4 +38,5 @@ func Execute() {
 func init() {
 
 	kube.Flags.AddFlags(rootCmd.PersistentFlags())
+	rootCmd.PersistentFlags().BoolVar(&flagDebug, "debug", false, "Activates debug mode. May log very verbose output to stderr")
 }

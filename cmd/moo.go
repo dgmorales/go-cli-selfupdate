@@ -23,7 +23,7 @@ Cowsaying is fun. What's more to say?
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		// we need no state at all on this command
-		start.ForLocalUse()
+		start.ForLocalUse(flagDebug)
 
 		say := "moo"
 		if len(args) > 0 {
