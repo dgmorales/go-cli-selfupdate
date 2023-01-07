@@ -124,6 +124,8 @@ func newGitHubMock(latestV string) *github.Client {
 // verifyExpectedVersions checks that the versions in the input GitHubChecker exactly match min, cur and latest
 func verifyExpectedVersions(t *testing.T, gc *version.GitHubChecker, tc versionsCaseSpec) {
 
+	t.Helper()
+
 	c := func(ver string, exp string) string {
 		if strings.TrimSpace(exp) == "" {
 			return unPrefixV(ver)
